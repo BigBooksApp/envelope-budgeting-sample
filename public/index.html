@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Envelopes · BigBooks</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%89%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">BigBooks</p>
+        <h1>Envelopes</h1>
+      </div>
+      <div class="topbar-actions">
+        <div class="period" role="group" aria-label="Budget period">
+          <button data-period="MONTH" class="is-active" type="button">Monthly</button>
+          <button data-period="QUARTER" type="button">Quarterly</button>
+          <button data-period="YEAR" type="button">Yearly</button>
+        </div>
+        <button id="autofill-btn" class="ghost-btn" type="button" hidden>Auto-fill</button>
+        <button id="signout" class="ghost-btn" type="button" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <div id="error" class="error" hidden></div>
+
+    <section class="connect card" id="connect" hidden>
+      <h2 id="connect-title">Connect your BigBooks account</h2>
+      <p class="muted" id="connect-msg">
+        Sign in with BigBooks to budget every dollar into an envelope. Nothing is stored
+        on a server — the token lives only in this browser tab.
+      </p>
+      <button id="connect-btn" class="primary-btn" type="button">Sign in with BigBooks</button>
+    </section>
+
+    <div id="app" hidden>
+
+      <nav class="periodnav" aria-label="Period navigation">
+        <button id="prev-period" class="step-btn" type="button" aria-label="Previous period">‹</button>
+        <h2 id="period-label" class="period-label">—</h2>
+        <button id="next-period" class="step-btn" type="button" aria-label="Next period">›</button>
+        <button id="this-period" class="ghost-btn small" type="button">Today</button>
+      </nav>
+
+      <section class="connect card" id="empty" hidden>
+        <h2>No income or expense categories yet</h2>
+        <p class="muted">
+          Envelopes are the income and expense categories on your BigBooks party. Import
+          transactions or create categories, then come back to assign every dollar.
+        </p>
+      </section>
+
+      <div id="budget">
+        <section class="hero" aria-live="polite">
+          <p class="hero-label">Left to assign</p>
+          <div class="hero-value" id="hero-value">—</div>
+          <p class="hero-status" id="hero-status"></p>
+          <div class="zerobar" id="zerobar" hidden>
+            <div class="zerobar-track"><span id="zerobar-fill"></span></div>
+            <p class="zerobar-legend" id="zerobar-legend"></p>
+          </div>
+        </section>
+
+        <section class="tiles" id="tiles" aria-label="Period summary"></section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Income</h2>
+            <span class="muted" id="income-note"></span>
+          </div>
+          <div id="income" class="envelopes"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Expense envelopes</h2>
+            <label class="toggle"><input type="checkbox" id="show-all" /> Show unbudgeted categories</label>
+          </div>
+          <div id="expenses" class="envelopes"></div>
+        </section>
+      </div><!-- /#budget -->
+    </div><!-- /#app -->
+
+    <footer class="foot">Data from the BigBooks API · budgets are read and written</footer>
+  </main>
+
+  <dialog id="autofill-dialog">
+    <form method="dialog" class="dlg">
+      <h2>Auto-fill this period</h2>
+      <p class="muted">
+        Fills every envelope from BigBooks' own history for the category — the mean of the
+        previous period's statistics. Existing amounts for this period are overwritten.
+      </p>
+      <label class="check"><input type="checkbox" id="rollover-surplus" /> Roll over last period's surplus (add what you underspent)</label>
+      <label class="check"><input type="checkbox" id="rollover-deficit" /> Roll over last period's deficit (subtract what you overspent)</label>
+      <div class="dlg-actions">
+        <button value="cancel" class="ghost-btn" type="submit">Cancel</button>
+        <button value="run" id="autofill-run" class="primary-btn" type="submit">Auto-fill</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+.DS_Store
+*.log
+public/config.local.js
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json
