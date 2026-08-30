@@ -5,6 +5,10 @@ A zero-based / envelope budgeting app built on the [BigBooks API](https://api.bi
 Authentication is **OAuth 2.0 Authorization Code + PKCE** entirely in the browser,
 so there is no client secret to protect and nothing runs server-side.
 
+![Envelopes: left to assign, the period tiles, and income and expense envelopes with meters](docs/envelopes.png)
+
+<sup>Screenshots from `#demo` mode — synthetic envelopes, no account needed.</sup>
+
 It shows:
 
 - **Left to assign** — planned income minus everything assigned to an envelope,
@@ -21,6 +25,8 @@ It shows:
 
 That last one is the point of a sample rather than a product clone — every figure on
 screen can be traced back to the API objects that produced it.
+
+![The provenance drawer open on an envelope, listing its entries and the requests behind each figure](docs/provenance.png)
 
 ## Envelopes are the budgeting API, not a convention layered on top
 
@@ -183,6 +189,7 @@ public/
   config.js     # ← your CLIENT_ID and endpoints
   app.js        # PKCE auth, budgeting calls, Plaid Link, rendering, provenance drawer
 openapi.json    # the BigBooks API spec, for reference
+docs/           # the README screenshots
 .claude/
   launch.json   # convenience config to serve public/ on :5173
 ```
