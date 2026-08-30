@@ -14,6 +14,8 @@ It shows:
 - **Monthly / quarterly / yearly** periods, with ‹ › stepping through them
 - **Auto-fill** from BigBooks' own category history, optionally rolling last period's
   surplus or deficit forward
+- **Link a bank/card account via Plaid** — the "+ Link account" button (and the
+  first-run empty state) opens Plaid Link and connects the institution
 - A **provenance drawer** on every envelope: the individual entries and journal ids
   behind the number, plus the exact requests that produced each figure
 
@@ -52,6 +54,32 @@ Browser (this static app)
   │  6. POST /v1/budgeting/autofill           ──►  fill every envelope from history
   └► GET /v1/entries/account/{uuid}/dates     ──►  the entries behind one envelope
 ```
+
+### Linking accounts (Plaid)
+
+Envelopes are income and expense categories, and categories come from transactions — so
+the first thing a new account needs is a linked institution. The app loads Plaid's Link
+SDK (`cdn.plaid.com`) and drives the standard flow; BigBooks holds the Plaid client
+id/secret, so none are needed in the browser:
+
+```
+Click "+ Link account"
+  │  POST /v1/plaid/public/token               ──►  { token }  (a Plaid Link token)
+  │  Plaid.create({ token }).open()            ──►  user authenticates with their bank
+  │  onSuccess(public_token, metadata)
+  │  POST /v1/plaid/access/token               ──►  server exchanges + saves the item
+  │     { publicToken, party, linkSessionId, webhook, institution, accounts }
+  └► reload the budget
+```
+
+**The exchange does not import transactions inline.** It saves the item; import is driven
+by Plaid's webhook afterwards. So envelopes appear over the following moments rather than
+on the next render — the app says so and offers a **Refresh** button instead of pretending
+the budget is empty. `webhook` is a required field on the exchange body and must be the
+API's own `…/v1/plaid/webhook`, which is the same URL BigBooks registers for itself when
+it mints the Link token, so it follows `CONFIG.API`.
+
+Requires the BigBooks environment to have Plaid credentials configured.
 
 Reads and writes that operate on a tenant send `X-Acting-Party-ID: <your party id>`.
 Item-level calls (`PUT /v1/budgeting/budget`, the entries drawer) derive tenancy from the
@@ -143,7 +171,8 @@ To preview the UI with synthetic envelopes and no sign-in, open:
 http://localhost:5173/#demo
 ```
 
-Amounts stay editable so you can watch the zero-based line recompute; nothing is saved.
+Amounts stay editable so you can watch the zero-based line recompute; nothing is saved,
+and account linking is disabled.
 
 ## Project layout
 
@@ -152,7 +181,7 @@ public/
   index.html    # markup + auth gate + auto-fill dialog
   styles.css    # theming (light/dark), palette, meters, layout
   config.js     # ← your CLIENT_ID and endpoints
-  app.js        # PKCE auth, budgeting calls, envelope rendering, provenance drawer
+  app.js        # PKCE auth, budgeting calls, Plaid Link, rendering, provenance drawer
 openapi.json    # the BigBooks API spec, for reference
 .claude/
   launch.json   # convenience config to serve public/ on :5173
@@ -168,6 +197,8 @@ openapi.json    # the BigBooks API spec, for reference
 | Assign / clear an envelope | `PUT /v1/budgeting/budget` |
 | Fill every envelope from history | `POST /v1/budgeting/autofill` |
 | Entries behind one envelope | `GET /v1/entries/account/{uuid}/dates?after_date=…&before_date=…` |
+| Start Plaid Link | `POST /v1/plaid/public/token` → `{ token }` |
+| Finish Plaid Link | `POST /v1/plaid/access/token` (exchange public token, save item) |
 
 Further reading: the [integrator guide](https://api.bigbooks.app/docs/integrator-guide.md)
 covers tenancy, concurrency, errors, and pagination conventions across every endpoint.

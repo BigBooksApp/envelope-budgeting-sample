@@ -81,7 +81,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
   font: inherit; font-size: 18px; line-height: 1; width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
 }
 .step-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
-.periodnav .ghost-btn { margin-left: auto; }
+.periodnav-actions { margin-left: auto; display: flex; gap: 8px; }
 
 /* -------------------------------------------------------------- hero figure */
 .hero { padding: 8px 0 20px; }
@@ -101,6 +101,14 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .zerobar-track span.full { border-radius: 5px; }
 .zerobar-track span.over { background: var(--critical); }
 .zerobar-legend { margin: 7px 0 0; color: var(--text-muted); font-size: 13px; }
+
+.note {
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--surface-1));
+  color: var(--text-secondary); border-radius: 12px;
+  padding: 12px 14px; margin: 0 0 16px; font-size: 13px; line-height: 1.5;
+}
+.note strong { color: var(--text-primary); }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
