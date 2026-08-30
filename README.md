@@ -65,8 +65,9 @@ Browser (this static app)
 
 Envelopes are income and expense categories, and categories come from transactions — so
 the first thing a new account needs is a linked institution. The app loads Plaid's Link
-SDK (`cdn.plaid.com`) and drives the standard flow; BigBooks holds the Plaid client
-id/secret, so none are needed in the browser:
+SDK (`cdn.plaid.com`) and drives the standard flow. No Plaid credentials go in the browser
+— BigBooks calls Plaid server-side with the client id and secret **you** stored on your
+account (see [Bring your own Plaid credentials](#bring-your-own-plaid-credentials)):
 
 ```
 Click "+ Link account"
@@ -84,8 +85,6 @@ on the next render — the app says so and offers a **Refresh** button instead o
 the budget is empty. `webhook` is a required field on the exchange body and must be the
 API's own `…/v1/plaid/webhook`, which is the same URL BigBooks registers for itself when
 it mints the Link token, so it follows `CONFIG.API`.
-
-Requires the BigBooks environment to have Plaid credentials configured.
 
 Reads and writes that operate on a tenant send `X-Acting-Party-ID: <your party id>`.
 Item-level calls (`PUT /v1/budgeting/budget`, the entries drawer) derive tenancy from the
@@ -128,6 +127,33 @@ These are real behaviors of the API that shaped the app:
   account including ones with no activity; `estimates` returns only accounts that have a
   budget. The app unions them so a budgeted-but-idle envelope still appears.
 
+## Bring your own Plaid credentials
+
+**BigBooks does not ship Plaid credentials and will not spend anyone else's.** Linking an
+account calls Plaid with **a client id and secret you stored yourself**, and the Plaid
+usage is billed to your Plaid account.
+
+Add them at **<https://www.bigbooks.app/data-secrets>** (sign-in required) — the page takes
+a **Plaid client ID** and a **Plaid secret**, which you get from the
+[Plaid dashboard](https://dashboard.plaid.com/developers/keys). Without them, the very
+first call of the link flow fails with `500 internal_error` and the message
+*"Plaid secret could not be resolved"*.
+
+Two details worth internalising:
+
+- Credentials are stored **per party**, and the party that matters is the one that **owns
+  the OAuth client** this app signs in with — the account you were signed in as at
+  <https://www.bigbooks.app/clients> when you created the client. Register the client under
+  one account and store the credentials under another and linking fails.
+- There is **nowhere in this repository to put a Plaid secret**, and that is deliberate.
+  Anything in `config.js` ships to every browser that loads the page. The API does accept
+  `X-Plaid-Client-ID` and `X-Plaid-Secret` headers as a fallback for server-side callers,
+  but stored credentials take precedence over them and a browser app must never send them.
+
+Your Plaid account's **environment matters too**: sandbox credentials only open sandbox
+institutions (use Plaid's test logins), production credentials need Plaid to have approved
+your account for production access.
+
 ## Setup
 
 ### 1. Register a public OAuth client
@@ -146,7 +172,14 @@ Create one at **<https://www.bigbooks.app/clients>** (sign-in required). New cli
 > Note that `http://localhost:5173` and `http://127.0.0.1:5173` are different origins, and
 > pages opened via `file://` send `Origin: null`, which can never be allowed.
 
-### 2. Configure the client id
+### 2. Store your Plaid credentials
+
+At **<https://www.bigbooks.app/data-secrets>**, signed in as the account that owns the
+client from step 1. See [Bring your own Plaid credentials](#bring-your-own-plaid-credentials)
+above. Skip this only if you do not intend to link an account — with no linked institution
+there are no transactions, so there are no categories to budget against.
+
+### 3. Configure the client id
 
 Edit [`public/config.js`](public/config.js) and set `CLIENT_ID`:
 
@@ -157,7 +190,7 @@ export const CONFIG = {
 };
 ```
 
-### 3. Serve the `public/` folder
+### 4. Serve the `public/` folder
 
 Any static file server works — the app just needs `http://` (ES modules and OAuth
 redirects don't work from `file://`):
