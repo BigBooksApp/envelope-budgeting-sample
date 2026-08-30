@@ -20,6 +20,7 @@
           <button data-period="QUARTER" type="button">Quarterly</button>
           <button data-period="YEAR" type="button">Yearly</button>
         </div>
+        <button id="link-btn" class="primary-btn" type="button" hidden>+ Link account</button>
         <button id="autofill-btn" class="ghost-btn" type="button" hidden>Auto-fill</button>
         <button id="signout" class="ghost-btn" type="button" hidden>Sign out</button>
       </div>
@@ -42,15 +43,27 @@
         <button id="prev-period" class="step-btn" type="button" aria-label="Previous period">‹</button>
         <h2 id="period-label" class="period-label">—</h2>
         <button id="next-period" class="step-btn" type="button" aria-label="Next period">›</button>
-        <button id="this-period" class="ghost-btn small" type="button">Today</button>
+        <span class="periodnav-actions">
+          <button id="refresh" class="ghost-btn small" type="button">Refresh</button>
+          <button id="this-period" class="ghost-btn small" type="button">Today</button>
+        </span>
       </nav>
+
+      <p class="note" id="empty-note" hidden>
+        Transactions are importing in the background — BigBooks pulls them in as Plaid
+        delivers them, so categories show up over the next few moments rather than
+        immediately. Give it a beat, then hit <strong>Refresh</strong>.
+      </p>
 
       <section class="connect card" id="empty" hidden>
         <h2>No income or expense categories yet</h2>
         <p class="muted">
-          Envelopes are the income and expense categories on your BigBooks party. Import
-          transactions or create categories, then come back to assign every dollar.
+          Envelopes are the income and expense categories on your BigBooks party, and
+          categories come from transactions. Securely connect a bank or card through Plaid —
+          as its transactions import and get categorized, those categories become
+          your envelopes.
         </p>
+        <button id="empty-link-btn" class="primary-btn" type="button">+ Link an account</button>
       </section>
 
       <div id="budget">
@@ -103,6 +116,7 @@
     </form>
   </dialog>
 
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
