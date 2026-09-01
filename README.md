@@ -247,3 +247,7 @@ covers tenancy, concurrency, errors, and pagination conventions across every end
 
 [networth-dashboard-sample](https://github.com/BigBooksApp/networth-dashboard-sample) — the
 same static-app pattern over balance sheets, accounts, and Plaid Link.
+
+## Questions
+
+Ask in the [BigBooks Developers Discord](https://discord.gg/DTwq2Ukuty).
