@@ -208,9 +208,11 @@ function periodLabel(period, anchor) {
 }
 
 // ------------------------------------------------------------- data loading
-// Two endpoints, same shape: { accounts: [...], budgetPeriods: [{date, amount, accountId}] }.
+// Two endpoints, same shape: { accounts, budgetPeriods: [{date, amount, accountId}], budgetPeriodTotals }.
 //   estimates → what you assigned      actuals → what actually moved
-// Both round amounts to whole units server-side.
+// Both round amounts to whole units server-side. budgetPeriods rows stay in each account's
+// own currency and must never be added across accounts; the cross-account figures come from
+// budgetPeriodTotals, already converted into one unit type (USD unless unit_type says otherwise).
 async function loadEnvelopes(party, period, anchor) {
   const { start, end } = periodBounds(period, anchor);
   const query = { after_date: iso(start), before_date: iso(end) };
@@ -233,7 +235,7 @@ async function loadEnvelopes(party, period, anchor) {
   const assigned = sum(estimates?.budgetPeriods);
   const activity = sum(actuals?.budgetPeriods);
 
-  return [...accounts.values()].map((a) => ({
+  const envelopes = [...accounts.values()].map((a) => ({
     id: a.id,
     name: a.name,
     accountType: a.accountType,
@@ -241,6 +243,21 @@ async function loadEnvelopes(party, period, anchor) {
     assigned: assigned.get(a.id) || 0,
     activity: activity.get(a.id) || 0,
   })).sort((a, b) => (b.assigned - a.assigned) || (b.activity - a.activity) || a.name.localeCompare(b.name));
+  return { envelopes, totals: periodTotals(estimates, actuals) };
+}
+
+// The top line, from the server's converted totals. Summing across periods (not accounts) is
+// safe: every row is in the same target unit type. A currency with no rate is left out of
+// revenues/expenses and named in unconvertedUnitTypes, so say so rather than hide it.
+function periodTotals(estimates, actuals) {
+  const add = (res, k) => (res?.budgetPeriodTotals || []).reduce((n, r) => n + Number(r[k] || 0), 0);
+  const unconverted = new Set([...(estimates?.budgetPeriodTotals || []), ...(actuals?.budgetPeriodTotals || [])]
+    .flatMap((r) => r.unconvertedUnitTypes || []));
+  return {
+    plannedIncome: add(estimates, 'revenues'), assigned: add(estimates, 'expenses'),
+    receivedIncome: add(actuals, 'revenues'), spent: add(actuals, 'expenses'),
+    unconverted: [...unconverted],
+  };
 }
 
 // The entries behind one envelope's "activity" figure, for the provenance drawer.
@@ -295,14 +312,17 @@ function autofill(party, period, anchor, rolloverSurplus, rolloverDeficit) {
 // -------------------------------------------------------------- rendering
 // Zero-based budgeting in one line: everything you expect to earn, minus
 // everything you assigned to an envelope, should be zero.
-function totals(envelopes) {
-  const t = { plannedIncome: 0, assigned: 0, receivedIncome: 0, spent: 0 };
-  for (const e of envelopes) {
-    if (e.accountType === 'REVENUE') { t.plannedIncome += e.assigned; t.receivedIncome += e.activity; }
-    else { t.assigned += e.assigned; t.spent += e.activity; }
-  }
+function totals() {
+  const t = { ...state.totals };
   t.toAssign = t.plannedIncome - t.assigned;
   return t;
+}
+
+// While a save is in flight, move the matching total by the edit so the top line answers at
+// once; the reload after the save replaces it with the server's converted figure.
+function adjustTotals(accountType, delta) {
+  const k = accountType === 'REVENUE' ? 'plannedIncome' : 'assigned';
+  state.totals = { ...state.totals, [k]: state.totals[k] + delta };
 }
 
 function renderHero(t) {
@@ -338,7 +358,8 @@ function renderTiles(t) {
     { k: 'Spent so far', v: t.spent },
   ];
   $('#tiles').innerHTML = tiles.map((x) =>
-    `<div class="tile"><div class="k">${x.k}</div><div class="v">${money0(x.v)}</div></div>`).join('');
+    `<div class="tile"><div class="k">${x.k}</div><div class="v">${money0(x.v)}</div></div>`).join('') +
+    (t.unconverted?.length ? `<p class="muted" style="grid-column:1/-1;margin:0">Excludes ${t.unconverted.map(escapeHtml).join(', ')} — no exchange rate for this period.</p>` : '');
 }
 
 // One envelope row: name, the assignable amount, what moved, and a meter whose
@@ -389,7 +410,7 @@ function envelopeRow(e) {
 }
 
 function render() {
-  const t = totals(state.envelopes);
+  const t = totals();
   renderHero(t);
   renderTiles(t);
 
@@ -466,10 +487,12 @@ async function commitAmount(input) {
   hideError();
 
   const previous = envelope.assigned;
+  const previousTotals = state.totals;
   envelope.assigned = amount || 0;
+  adjustTotals(envelope.accountType, envelope.assigned - previous);
   // The top line recomputes on every change. Only the hero and tiles re-render here —
   // a full render would replace the input the user is still interacting with.
-  const t = totals(state.envelopes);
+  const t = totals();
   renderHero(t);
   renderTiles(t);
 
@@ -484,6 +507,7 @@ async function commitAmount(input) {
     await reload({ quiet: true });
   } catch (e) {
     envelope.assigned = previous;
+    state.totals = previousTotals;
     render();
     if (e instanceof AuthExpired) return showConnect('Your session expired. Please sign in again.', 'Session expired');
     showError(escapeHtml(e.message));
@@ -521,7 +545,6 @@ async function openPlaidLink() {
   setLinkBusy(true);
   try {
     const { token } = await api('POST', '/v1/plaid/public/token', {
-      party: state.party,
       body: {
         clientName: 'BigBooks Envelopes',
         language: 'en',
@@ -557,22 +580,16 @@ async function openPlaidLink() {
   }
 }
 
-// `webhook` is required on this body and must be the API's own webhook URL — the
-// same one BigBooks registers for itself when it mints the Link token — so it
-// follows CONFIG.API rather than being a free-form client value.
+// The body's `party` names the tenant, so this call takes no X-Acting-Party-ID header.
+// There is no webhook to send: BigBooks sets the item's webhook to its own receiver.
 function exchangePublicToken(publicToken, metadata) {
   const inst = metadata.institution || {};
   return api('POST', '/v1/plaid/access/token', {
-    party: state.party,
     body: {
       publicToken,
       party: state.party,
       linkSessionId: metadata.link_session_id,
-      webhook: `${CONFIG.API}/v1/plaid/webhook`,
       institution: inst.institution_id ? { id: inst.institution_id, name: inst.name } : null,
-      accounts: (metadata.accounts || []).map((a) => ({
-        id: a.id, name: a.name, mask: a.mask, type: a.type, subtype: a.subtype,
-      })),
     },
   });
 }
@@ -588,7 +605,7 @@ function flash(msg) {
 }
 
 // ------------------------------------------------------------------ state
-const state = { party: null, period: 'MONTH', anchor: new Date(), envelopes: [], showAll: false, demo: false };
+const state = { party: null, period: 'MONTH', anchor: new Date(), envelopes: [], totals: null, showAll: false, demo: false };
 
 function showError(msg) { const e = $('#error'); e.hidden = false; e.innerHTML = msg; }
 function hideError() { $('#error').hidden = true; }
@@ -608,7 +625,7 @@ async function reload({ quiet } = {}) {
   $('#period-label').textContent = periodLabel(state.period, state.anchor);
   if (!quiet) hideError();
   try {
-    state.envelopes = await loadEnvelopes(state.party, state.period, state.anchor);
+    ({ envelopes: state.envelopes, totals: state.totals } = await loadEnvelopes(state.party, state.period, state.anchor));
     const empty = state.envelopes.length === 0;
     $('#empty').hidden = !empty;
     $('#budget').hidden = empty;
@@ -726,6 +743,9 @@ function runDemo() {
   showApp();
   $('#signout').hidden = true; $('#link-btn').hidden = true;
   state.envelopes = DEMO.map((e) => ({ ...e }));
+  // The demo stands in for the server's budgetPeriodTotals: one currency, so its rows add up.
+  const add = (type, k) => state.envelopes.filter((e) => (e.accountType === 'REVENUE') === (type === 'REVENUE')).reduce((n, e) => n + e[k], 0);
+  state.totals = { plannedIncome: add('REVENUE', 'assigned'), assigned: add('EXPENSE', 'assigned'), receivedIncome: add('REVENUE', 'activity'), spent: add('EXPENSE', 'activity'), unconverted: [] };
   $('#period-label').textContent = periodLabel(state.period, state.anchor);
   $('#empty').hidden = true;
   $('#budget').hidden = false;
