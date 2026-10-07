@@ -75,32 +75,37 @@ Click "+ Link account"
   │  Plaid.create({ token }).open()            ──►  user authenticates with their bank
   │  onSuccess(public_token, metadata)
   │  POST /v1/plaid/access/token               ──►  server exchanges + saves the item
-  │     { publicToken, party, linkSessionId, webhook, institution, accounts }
+  │     { publicToken, party, linkSessionId, institution }
   └► reload the budget
 ```
 
 **The exchange does not import transactions inline.** It saves the item; import is driven
 by Plaid's webhook afterwards. So envelopes appear over the following moments rather than
 on the next render — the app says so and offers a **Refresh** button instead of pretending
-the budget is empty. `webhook` is a required field on the exchange body and must be the
-API's own `…/v1/plaid/webhook`, which is the same URL BigBooks registers for itself when
-it mints the Link token, so it follows `CONFIG.API`.
+the budget is empty. There is no webhook for the app to send: BigBooks sets each item's
+webhook to its own receiver.
 
 Reads and writes that operate on a tenant send `X-Acting-Party-ID: <your party id>`.
 Item-level calls (`PUT /v1/budgeting/budget`, the entries drawer) derive tenancy from the
-account they address and take no header. The access token lives only in `sessionStorage`
+account they address and take no header; neither do the two Plaid token calls (the exchange
+names the party in its body). The access token lives only in `sessionStorage`
 for the current tab.
 
 ### The zero-based line
 
 ```
-planned income   = Σ estimates where accountType = REVENUE
-assigned         = Σ estimates where accountType = EXPENSE
+planned income   = estimates.budgetPeriodTotals[].revenues
+assigned         = estimates.budgetPeriodTotals[].expenses
 left to assign   = planned income − assigned          ← the hero figure; the goal is 0
 ```
 
-`actuals` supplies the other half — income received and money spent — so each envelope
-shows assigned vs. actual side by side.
+`actuals` supplies the other half — income received and money spent — from its own
+`budgetPeriodTotals`, and each envelope shows assigned vs. actual side by side. The top
+line never adds up the per-account `budgetPeriods` rows itself: those stay in each
+account's own currency, while `budgetPeriodTotals` is converted into one unit type, with
+any currency that had no rate named in `unconvertedUnitTypes` (the app says so under the
+tiles). While a save is in flight the top line moves by the edit, then the re-read replaces
+it with the server's figure.
 
 ## Things worth knowing before you copy this code
 
@@ -111,7 +116,7 @@ These are real behaviors of the API that shaped the app:
   leans on this deliberately — clearing the input removes the envelope's budget — but a
   serializer that emits nulls by default will delete budgets it only meant to leave alone.
   Use `POST` if you never intend deletion.
-- **Budgets are stored per day.** `createOrUpdateBudget` spreads the amount you send
+- **Budgets are stored per day.** `PUT /v1/budgeting/budget` spreads the amount you send
   evenly across every day in `afterDate…beforeDate`, rounding each day to cents. The
   period total you read back can therefore differ from what you wrote by a few cents.
   The app re-reads after every save instead of trusting its optimistic value.
@@ -136,8 +141,7 @@ usage is billed to your Plaid account.
 Add them at **<https://www.bigbooks.app/data-secrets>** (sign-in required) — the page takes
 a **Plaid client ID** and a **Plaid secret**, which you get from the
 [Plaid dashboard](https://dashboard.plaid.com/developers/keys). Without them, the very
-first call of the link flow fails with `500 internal_error` and the message
-*"Plaid secret could not be resolved"*.
+first call of the link flow fails with `400` and the error code `missing_credentials`.
 
 Two details worth internalising:
 
