@@ -2,7 +2,7 @@
 //
 // Fill in CLIENT_ID with a PUBLIC OAuth client registered in BigBooks
 // (token endpoint auth method "none", PKCE / S256). Create one at
-// https://www.bigbooks.app/clients. That client must have:
+// https://staging.bigbooks.app/clients. That client must have:
 //   • Redirect URI  = this app's URL, e.g. http://localhost:5173/
 //
 // The CORS allow-list for /oauth2/token and /oauth2/userInfo is derived from the
@@ -16,11 +16,11 @@ export const CONFIG = {
   CLIENT_ID: '',                                  // <-- your public client_id
 
   // Authorization server (issuer) and REST API live on different hosts.
-  ISSUER: 'https://www.bigbooks.app',
-  API: 'https://api.bigbooks.app',
-  AUTHORIZE_URL: 'https://www.bigbooks.app/oauth2/authorize',
-  TOKEN_URL: 'https://www.bigbooks.app/oauth2/token',
-  USERINFO_URL: 'https://www.bigbooks.app/oauth2/userInfo',
+  ISSUER: 'https://staging.bigbooks.app',
+  API: 'https://staging.bigbooks.app/api',
+  AUTHORIZE_URL: 'https://staging.bigbooks.app/oauth2/authorize',
+  TOKEN_URL: 'https://staging.bigbooks.app/oauth2/token',
+  USERINFO_URL: 'https://staging.bigbooks.app/oauth2/userInfo',
 
   // openid is required to receive the `bigbooks:party` userInfo claim.
   SCOPES: 'openid profile email',
